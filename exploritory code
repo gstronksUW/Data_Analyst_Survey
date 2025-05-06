@@ -1,0 +1,178 @@
+DROP TABLE data_professional_survey;
+
+CREATE TABLE data_professional_survey (
+    unique_id TEXT,
+    email TEXT,
+    date_taken_americanew_york DATE,
+    time_taken_americanew_york TEXT,
+    browser TEXT,
+    os TEXT,
+    city TEXT,
+    country TEXT,
+    referrer TEXT,
+    time_spent TEXT,
+    q1__which_title_best_fits_your_current_role TEXT,
+    q2__did_you_switch_careers_into_data TEXT,
+    q3__current_yearly_salary_in_usd TEXT,
+    q4__what_industry_do_you_work_in TEXT,
+    q5__favorite_programming_language TEXT,
+    q6__how_happy_salary NUMERIC,
+    q6__how_happy_worklife_balance NUMERIC,
+    q6__how_happy_coworkers NUMERIC,
+    q6__how_happy_are_you_management INTEGER,
+    q6__how_happy_are_you_upward_mobility NUMERIC,
+    q6__how_happy_are_you_learning_new_things NUMERIC,
+    q7__how_difficult_break_into_data TEXT,
+    q8__new_job_today_most_important_thing_to_you TEXT,
+    q9__malefemale TEXT,
+    q10__current_age INTEGER,
+    q11__which_country_do_you_live_in TEXT,
+    q12__highest_level_of_education TEXT,
+    q13__ethnicity TEXT
+);
+
+
+
+
+
+
+COPY data_professional_survey
+FROM 'C:\Users\gimma\Desktop\Business Analysis\Projects\Power BI\Alex the Analyst Power BI project\Power BI - Final Project - Copy UTF 8.csv'
+WITH (
+    FORMAT csv,
+    HEADER true,
+    ENCODING 'WIN1252'
+);
+
+
+
+UPDATE data_professional_survey
+SET q3__current_yearly_salary_in_usd = (
+    (
+        REGEXP_REPLACE(SPLIT_PART(q3__current_yearly_salary_in_usd, '-', 1), '[^0-9]', '', 'g')::NUMERIC +
+        REGEXP_REPLACE(SPLIT_PART(q3__current_yearly_salary_in_usd, '-', 2), '[^0-9]', '', 'g')::NUMERIC
+    ) / 2
+)::TEXT
+WHERE q3__current_yearly_salary_in_usd ~ '^[0-9, ]+-[0-9, ]+$';
+
+
+
+UPDATE data_professional_survey
+SET q3__current_yearly_salary_in_usd = (
+    (
+        REGEXP_REPLACE(SPLIT_PART(q3__current_yearly_salary_in_usd, '-', 1), '[^0-9]', '', 'g')::NUMERIC +
+        REGEXP_REPLACE(SPLIT_PART(q3__current_yearly_salary_in_usd, '-', 2), '[^0-9]', '', 'g')::NUMERIC
+    ) / 2
+)::TEXT
+WHERE q3__current_yearly_salary_in_usd LIKE '%-%'
+  AND q3__current_yearly_salary_in_usd ~ '[0-9]';
+
+UPDATE data_professional_survey
+SET q3__current_yearly_salary_in_usd = REGEXP_REPLACE(
+    q3__current_yearly_salary_in_usd,
+    '\+$',  -- regex: match plus at the end
+    '',
+    'g'
+)
+WHERE q3__current_yearly_salary_in_usd LIKE '%+';
+
+
+
+UPDATE data_professional_survey
+SET q3__current_yearly_salary_in_usd = REGEXP_REPLACE(
+    q3__current_yearly_salary_in_usd,
+    '[kK]$',   -- match 'k' or 'K' at the end
+    '',
+    'g'
+)
+WHERE q3__current_yearly_salary_in_usd ~ '[kK]$';
+
+
+
+UPDATE data_professional_survey
+SET q3__current_yearly_salary_in_usd = ROUND(q3__current_yearly_salary_in_usd::NUMERIC) * 1000
+::TEXT
+WHERE q3__current_yearly_salary_in_usd ~ '^[0-9\.]+$';
+
+UPDATE data_professional_survey
+SET q3__current_yearly_salary_in_usd = (ROUND(q3__current_yearly_salary_in_usd::NUMERIC) * 1000)::INTEGER
+WHERE q3__current_yearly_salary_in_usd ~ '^[0-9\.]+$';
+
+
+select * 
+from 
+	data_professional_survey
+	;
+
+--what is the average salary of a data analyst in Healthcare
+
+ALTER TABLE data_professional_survey
+RENAME COLUMN q3__current_yearly_salary_in_usd TO Salary;
+
+ALTER TABLE data_professional_survey
+RENAME COLUMN q4__what_industry_do_you_work_in TO Industry;
+
+ALTER TABLE data_professional_survey
+RENAME COLUMN q1__which_title_best_fits_your_current_role TO Current_Title ;
+
+ALTER TABLE data_professional_survey
+ALTER COLUMN Salary TYPE NUMERIC
+USING Salary::NUMERIC;
+
+UPDATE data_professional_survey
+SET Current_Title = REGEXP_REPLACE(Current_Title, '^[^)]*\)', '')
+WHERE Current_Title LIKE '%%)%';
+
+UPDATE data_professional_survey
+SET Current_Title = REGEXP_REPLACE(Current_Title, ':', '', 'g')
+WHERE Current_Title LIKE '%:%';
+
+--Average Salary for all titles 
+
+SELECT Current_Title, ROUND(AVG(Salary::NUMERIC), 2) AS average_salary
+FROM data_professional_survey
+WHERE Current_Title <> 'I work with data tools and can create simple dashboards but I am not a data scientist'
+ 
+GROUP BY Current_Title;
+
+
+-- Average Salary for all Industry
+
+UPDATE data_professional_survey
+SET Industry = REGEXP_REPLACE(Industry, '^[^)]*\)', '')
+WHERE Industry LIKE '%%)%';
+
+UPDATE data_professional_survey
+SET Industry = REGEXP_REPLACE(Industry, ':', '', 'g')
+WHERE Industry LIKE '%:%';
+
+SELECT Industry, ROUND(AVG(Salary::NUMERIC), 2) AS average_salary
+FROM data_professional_survey
+WHERE Current_Title <> 'I work with data tools and can create simple dashboards but I am not a data scientist'
+ 
+GROUP BY Industry;
+
+
+-- Favority Programing language / what is the count of each type of language preference 
+ALTER TABLE data_professional_survey
+RENAME COLUMN "q5__favorite_programming_language" TO Fav_Language;
+
+UPDATE data_professional_survey
+SET Fav_Language = REGEXP_REPLACE(Fav_Language, '\bother\b', '', 'gi')
+WHERE Fav_Language ILIKE '%Other%';
+
+UPDATE data_professional_survey
+SET Fav_Language = REGEXP_REPLACE(Fav_Language, '^Other(:?.*)', '', 'gi')
+WHERE Fav_Language ILIKE 'Other%';
+
+select 
+	distinct(Fav_Language), count(unique_ID)
+from
+	data_professional_survey
+Group by
+	Fav_Language
+Order by 
+	count(unique_ID) Desc
+	;
+
+--What is the count of each language preference in each industry 
